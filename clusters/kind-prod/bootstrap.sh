@@ -44,6 +44,10 @@ helm upgrade --install kyverno kyverno/kyverno \
 echo "==> Waiting for Kyverno to be ready"
 kubectl wait --for=condition=available --timeout=300s deployment/kyverno-admission-controller -n kyverno
 
+# Apply Kyverno image signature verification policy
+echo "==> Applying Kyverno image signature policy"
+kubectl apply -f "$(dirname "$0")/../policies/verify-image-signatures.yaml"
+
 # Install Argo Rollouts (prod only)
 echo "==> Installing Argo Rollouts"
 kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
