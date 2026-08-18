@@ -1,0 +1,57 @@
+name: promote-prod
+
+# Manual promotion gate: dev is updated automatically by the app repo's CI,
+# prod is only ever changed from here. Opens a PR instead of pushing to main so
+# the promotion itself is reviewable and shows up in the audit trail.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to promote (default: whatever dev is running)"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/java-sample-app
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: tag
+        name: Resolve tag to promote
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG=$(grep -oP 'newTag:\s*\K\S+' environments/dev/kustomization.yaml)
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Verify image signature before promoting
+        run: |
+          cosign verify "${IMAGE}:${{ steps.tag.outputs.tag }}" \
+            --certificate-identity-regexp="^https://github.com/${{ github.repository_owner }}/java-sample-app/" \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+      - name: Open promotion PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          BRANCH="promote/prod-${TAG}"
+          git config user.name "promotion-bot"
+          git config user.email "promotion-bot@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          sed -i "s|newTag: .*|newTag: ${TAG}|" environments/prod/kustomization.yaml
+          git commit -am "promote java-sample-app:${TAG} to prod"
+          git push -u origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "promote java-sample-app:${TAG} to prod" \
+            --body "Signature verified against the GitHub Actions OIDC identity of \`${{ github.repository_owner }}/java-sample-app\`. Merging triggers the prod Argo CD app, which rolls out via canary with background analysis."

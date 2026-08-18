@@ -7,26 +7,12 @@ spec:
   - name: service-name
   metrics:
   - name: health-check
+    # Runs as background analysis for the whole canary. Three consecutive
+    # non-UP readings abort the rollout and scale the canary back down.
     interval: 30s
-    successCondition: result == "true"
     failureLimit: 3
+    successCondition: result == "UP"
     provider:
-      job:
-        spec:
-          backoffLimit: 1
-          template:
-            spec:
-              restartPolicy: Never
-              containers:
-              - name: curl
-                image: curlimages/curl:8.9.1
-                command:
-                - sh
-                - -c
-                - |
-                  response=$(curl -s -o /dev/null -w "%{http_code}" http://{{args.service-name}}:8080/actuator/health)
-                  if [ "$response" -eq 200 ]; then
-                    echo "true"
-                  else
-                    echo "false"
-                  fi
+      web:
+        url: http://{{args.service-name}}:8080/actuator/health
+        jsonPath: "{$.status}"
