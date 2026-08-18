@@ -4,7 +4,7 @@ set -euo pipefail
 CLUSTER_NAME="kind-dev"
 ARGOCD_VERSION="v2.12.3"
 SEALED_SECRETS_VERSION="v0.27.1"
-KYVERNO_VERSION="v1.12.5"
+KYVERNO_CHART_VERSION="3.8.2"
 
 echo "==> Bootstrapping ${CLUSTER_NAME}"
 
@@ -32,13 +32,13 @@ echo "==> Waiting for Sealed Secrets controller"
 kubectl wait --for=condition=available --timeout=300s deployment/sealed-secrets-controller -n kube-system
 
 # Install Kyverno
-echo "==> Installing Kyverno ${KYVERNO_VERSION}"
+echo "==> Installing Kyverno ${KYVERNO_CHART_VERSION}"
 kubectl create namespace kyverno --dry-run=client -o yaml | kubectl apply -f -
 helm repo add kyverno https://kyverno.github.io/kyverno/ || true
 helm repo update
 helm upgrade --install kyverno kyverno/kyverno \
   --namespace kyverno \
-  --version "${KYVERNO_VERSION}" \
+  --version "${KYVERNO_CHART_VERSION}" \
   --wait
 
 echo "==> Waiting for Kyverno to be ready"
