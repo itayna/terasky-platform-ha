@@ -10,6 +10,15 @@ on:
 
 jobs:
   delivery:
+    # Reusable-workflow permissions are capped by what the caller grants —
+    # id-token in particular is never inherited from repo/org defaults, even
+    # when "Read and write permissions" is on. Without this block the run
+    # fails signing with "id-token: none" regardless of the called
+    # workflow's own permissions:.
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     uses: __OWNER__/platform-workflows/.github/workflows/java-service-delivery.yml@v1
     with:
       service-name: __SERVICE__
