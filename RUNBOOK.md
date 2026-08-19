@@ -194,34 +194,108 @@ kubectl -n kube-system delete pod -l name=sealed-secrets-controller
 
 ## The platform bar, and falling off it
 
-A service is on the paved road when all of the following hold. This is the list a
-compliance check should assert, and today only the first three are enforced by
-machinery rather than by review:
+A service is on the paved road when all of the following hold. `bin/scorecard`
+asserts every row per service, daily and on every push to `main`, and exits
+non-zero if any is red:
 
-| # | Requirement | Enforced by |
-|---|---|---|
-| 1 | Image signed by the service's own delivery workflow on `main` | Kyverno, at admission (**hard**) |
-| 2 | No CRITICAL CVEs in source or image | Trivy gates in CI (**hard**) |
-| 3 | Deployed only via Argo CD from this repository | `selfHeal` reverts anything else (**hard**) |
-| 4 | SBOM published for every image | CI step exists; nothing verifies it later |
-| 5 | Health endpoints wired to probes and to canary analysis | convention |
-| 6 | Prod changes arrive as promotion PRs | convention |
+| # | Requirement | Enforced by | Scorecard column |
+|---|---|---|---|
+| 1 | Image signed by the platform pipeline | Kyverno, at admission (**hard**) | Signed |
+| 2 | No CRITICAL CVEs in source or image | Trivy gates in CI (**hard**) | Pipeline (a service on `@v1` has them) |
+| 3 | Deployed only via Argo CD from this repository | `selfHeal` reverts anything else (**hard**) | GitOps |
+| 4 | SBOM published for every image | CI step, verified after the fact | SBOM |
+| 5 | Health endpoints wired to probes and to canary analysis | scorecard greps the manifests | GitOps |
+| 6 | Prod changes arrive as promotion PRs | scorecard matches the tag to a promotion commit | Promoted via PR |
+| 7 | An owner of record | `CODEOWNERS` in the service repository | Owner |
 
 **A service falls off the road** in one of two ways:
 
 - *Loudly* — it stops satisfying 1–3. It cannot deploy. Nothing to decide; fix
   the pipeline.
-- *Quietly* — it stops satisfying 4–6: someone adds a second workflow that
-  builds images, pins prod by editing `environments/prod` directly, or drops the
-  Actuator dependency so the canary analysis passes vacuously. Nothing breaks.
-  This is the dangerous case, and today it is caught only by a human reading a
-  diff. Closing that gap is the top Stage 2 item in [FUTURE.md](FUTURE.md).
+- *Quietly* — it stops satisfying 4–7: someone adds a second workflow that builds
+  images, pins prod by editing `environments/prod` directly, or drops the Actuator
+  dependency so the canary analysis passes vacuously. Nothing breaks at deploy
+  time. This is the case the scorecard exists for: the quiet failure becomes a red
+  row and a failing check within a day.
 
-**Rejoining** means, in order: restore the delivery workflow from the template
-(so the trusted OIDC subject matches the policy again), confirm the Trivy gates
-run and pass, and delete any manifests applied outside Argo CD so the next sync
-is a no-op rather than a fight with `selfHeal`. Verify by deploying one
-deliberate no-op change end to end.
+**Rejoining** means, in order: restore the three-line `delivery.yml` from
+`templates/service-v1/repo/` (so the trusted OIDC subject matches the policy
+again), confirm the Trivy gates run and pass, and delete any manifests applied
+outside Argo CD so the next sync is a no-op rather than a fight with `selfHeal`.
+Verify by deploying one deliberate no-op change end to end.
+
+## A red row in CATALOG.md
+
+`bin/scorecard` locally reproduces exactly what the workflow asserts (without
+`cosign` installed it renders the two registry columns `⚠️` rather than passing
+them):
+
+```bash
+bin/scorecard            # writes CATALOG.md, exits 1 on any red row
+```
+
+| Column | Red means | Fix |
+|---|---|---|
+| Owner `❌ none` | no `CODEOWNERS` in the service repository | add `* @handle`; it is the ownership of record, not decoration |
+| Pipeline `❌ own copy` | the service has its own copy of the pipeline, so platform-mandated steps never reach it | replace `.github/workflows/delivery.yml` with the template stub |
+| Pipeline `⚠️ v1.0` | deliberately pinned behind the floating tag | fine short-term; the warning is the point — move it to `@v1` when the team can |
+| Signed `❌` | `cosign verify` failed for the dev tag against the pipeline identity | the image was built by something else. Check the run that produced it; re-push to rebuild through the pipeline |
+| SBOM `❌` | no SPDX document attached to that tag | usually the same cause as Signed; an image predating the SBOM step also fails and should be rebuilt |
+| GitOps `❌` | a missing child `Application`, `selfHeal` off, no `readinessProbe`, or the Rollout does not reference `health-check` | compare against `templates/service-v1/`; all four are rendered correctly by `platformctl` |
+| Promoted via PR `❌` | the prod tag has no `promote <service>:<tag> to prod` commit in this history | someone edited `environments/prod` by hand. Roll it back and re-promote through `promote-prod`, or the audit trail is a lie |
+
+A red row fails the check but changes nothing in a cluster. It is a signal, never
+an enforcement action — enforcement lives at admission.
+
+## Shipping a pipeline change to every service
+
+The pipeline is one reusable workflow in `itayna/platform-workflows`; services
+reference `@v1` ([ADR-0010](docs/adr/0010-pipeline-version-tags.md)).
+
+1. Commit the change on `main` there and test it against one service by
+   temporarily pointing that service's `uses:` at `@main`.
+2. Release it:
+   ```bash
+   git tag v1.1 && git push origin v1.1     # immutable release
+   git tag -f v1 v1.1 && git push -f origin v1   # floating tag every service tracks
+   ```
+3. Every service picks it up on its next push. No service repository changes.
+4. Confirm adoption in `CATALOG.md` — the Pipeline column shows what each service
+   pins.
+
+**Rolling back a bad release** is moving the floating tag back, because `v1.x` is
+immutable:
+
+```bash
+git tag -f v1 v1.0 && git push -f origin v1
+```
+
+In-flight runs already resolved the old ref and are unaffected; the next push per
+service uses `v1.0` again. A service that cannot wait pins `@v1.0` itself, which
+shows up as `⚠️ v1.0` in the catalog rather than as a private arrangement.
+
+Note the force-push against a shared ref. It is the documented mechanism, not an
+accident, and it is why `v1.x` tags are never moved.
+
+## Onboarding failed halfway
+
+`bin/platformctl new <service>` does four things that can fail independently: it
+renders manifests into the working tree, creates the service repository, appends
+the catalog, and opens a pull request. It is not transactional — it refuses to
+start rather than trying to unwind.
+
+| Symptom | Cause | Recovery |
+|---|---|---|
+| `error: <name> is already in the catalog` | re-running for a live service | intentional. Re-onboarding is a manifest edit, not a scaffold |
+| `gh: Name already exists on this account` | the service repository exists | `platformctl new <svc> --no-repo` to generate manifests only, or pick another name |
+| Branch and files exist, no PR | `gh pr create` failed (auth, or `main` moved) | the working tree is correct — push the branch and open the PR by hand |
+| PR merged, no pods in dev | the service has no image yet | expected: `newTag: awaiting-first-promotion`. The first push to the service repo produces the first image |
+| PR merged, Application missing in Argo CD | root app not registered on that cluster | `make apps` (once per cluster, ever), then `make status` |
+| Pods `ImagePullBackOff` | the shared GHCR pull secret is missing or sealed for the other cluster | `kubectl -n default get secret ghcr-pull`; reseal `environments/<env>/_platform/` for that cluster |
+| Pods denied at admission | the image is not signed by the pipeline identity | the service is probably still on a copied workflow — see the Pipeline column above |
+
+Dry-run first when in doubt: `bin/platformctl new <svc> --dry-run` renders the
+full tree into a scratch copy and prints it, touching nothing.
 
 ## Emergency: a bad image is in prod
 

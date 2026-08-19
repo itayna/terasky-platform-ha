@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: __SERVICE__-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:__OWNER__/terasky-platform-ha.git
+    targetRevision: main
+    path: environments/dev/__SERVICE__
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+  # Kyverno's verifyImages rewrites the tag to tag@sha256:... on admission, so
+  # the live spec never matches Git. Without this the app is permanently
+  # OutOfSync and selfHeal fights the mutation on every sync. Ignoring the field
+  # keeps digest pinning (which closes the re-pushed-tag window between
+  # verification and pull) instead of disabling it to make the UI green.
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    jsonPointers:
+    - /spec/template/spec/containers/0/image

@@ -68,6 +68,7 @@ spec:
         startingStep: 1
         templates:
         - templateName: health-check
+          clusterScope: true
         args:
         - name: service-name
           value: java-sample-app-canary

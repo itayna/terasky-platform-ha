@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:itayna/terasky-platform-ha.git
+    targetRevision: main
+    # See root-dev.yaml. Registering a service in prod is still just a merged
+    # PR; what gates prod is the promotion workflow's signature check and the
+    # canary, not a human running kubectl.
+    path: gitops/argocd-apps/prod
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

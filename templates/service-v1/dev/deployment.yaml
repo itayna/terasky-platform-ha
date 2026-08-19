@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: __SERVICE__
+  labels:
+    app: __SERVICE__
+    env: dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: __SERVICE__
+  template:
+    metadata:
+      labels:
+        app: __SERVICE__
+        env: dev
+    spec:
+      imagePullSecrets:
+      - name: ghcr-pull-secret
+      containers:
+      - name: app
+        image: ghcr.io/__OWNER__/__SERVICE__:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: ENVIRONMENT
+          value: "development"
+        - name: APP_NAME
+          value: "__SERVICE__ (dev)"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

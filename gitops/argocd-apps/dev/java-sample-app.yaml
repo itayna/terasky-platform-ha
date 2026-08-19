@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: git@github.com:itayna/terasky-platform-ha.git
     targetRevision: main
-    path: environments/dev
+    path: environments/dev/java-sample-app
   destination:
     server: https://kubernetes.default.svc
     namespace: default

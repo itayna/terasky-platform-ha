@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: __SERVICE__-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:__OWNER__/terasky-platform-ha.git
+    targetRevision: main
+    path: environments/prod/__SERVICE__
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+  # No ignoreDifferences here: Kyverno's verify-ghcr-images autogen only
+  # covers Deployment/DaemonSet/StatefulSet/CronJob (see dev-app.yaml), not
+  # the Rollout CRD, so nothing mutates this image field post-admission.
+  # Ignoring it froze the field at whatever image first got applied and
+  # promotions never reached the live Rollout.

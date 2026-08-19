@@ -1,0 +1,12 @@
+# Every service on the paved road. `bin/platformctl new` appends an entry; the
+# daily scorecard workflow iterates this file and writes CATALOG.md from it.
+#
+# Deliberately just an identity: the manifest paths are environments/<env>/<name>,
+# the image is ghcr.io/<owner>/<name>, the owner is the service repository's
+# CODEOWNERS, and the pinned pipeline version is that repository's delivery.yml.
+# The scorecard reads each of those from source, so nothing here can drift out of
+# agreement with reality.
+services:
+- name: java-sample-app
+  repo: itayna/java-sample-app
+  onboarded: 2026-08-18
