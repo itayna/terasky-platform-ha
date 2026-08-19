@@ -1,0 +1,53 @@
+name: scorecard
+
+# Compliance as a failing check. bin/scorecard derives each service's row from a
+# source of truth (CODEOWNERS, the service's delivery.yml, cosign, this
+# repository's promotion history) and exits non-zero on a red row, so a service
+# that drifts off the platform bar produces a failed run — not a dashboard nobody
+# opens. The generated CATALOG.md is committed so the current state is reviewable
+# in this repository's history.
+on:
+  schedule:
+  - cron: "17 6 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+    - catalog/services.yaml
+    - environments/**
+    - gitops/**
+    - bin/scorecard
+
+permissions:
+  contents: write
+
+jobs:
+  scorecard:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # The promotion trail is checked against git history, so a shallow clone
+        # would report a legitimately promoted tag as unpromoted.
+        fetch-depth: 0
+    - uses: sigstore/cosign-installer@v3
+    - name: Assert the platform bar
+      id: scorecard
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Keep going so the catalog is still published when a row is red; the
+      # verdict is re-raised after the commit.
+      continue-on-error: true
+      run: bin/scorecard
+    - name: Commit CATALOG.md if it changed
+      run: |
+        git diff --quiet CATALOG.md && exit 0
+        git config user.name "scorecard-bot"
+        git config user.email "scorecard-bot@users.noreply.github.com"
+        git commit -qm "scorecard: refresh CATALOG.md" CATALOG.md
+        git push -q
+    - name: Fail if any service is off the bar
+      if: steps.scorecard.outcome == 'failure'
+      run: |
+        echo "::error::a service no longer meets the platform bar - see CATALOG.md"
+        exit 1

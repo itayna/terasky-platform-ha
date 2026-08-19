@@ -2,6 +2,12 @@
 
 Manual and automatic rollback procedures.
 
+Every command below is per service. Set it once:
+
+```bash
+SERVICE=java-sample-app
+```
+
 ## Automatic Rollback (Prod Canary)
 
 Argo Rollouts auto-aborts canary on health check failures.
@@ -50,21 +56,21 @@ Revert to last known good image:
 
 ```bash
 cd terasky-platform-ha
-git log --oneline environments/prod/kustomization.yaml
+git log --oneline environments/prod/$SERVICE/kustomization.yaml
 ```
 
 Find last working commit, extract image tag:
 
 ```bash
-git show <commit-sha>:environments/prod/kustomization.yaml | grep newTag
+git show <commit-sha>:environments/prod/$SERVICE/kustomization.yaml | grep newTag
 ```
 
 Revert prod kustomization:
 
 ```bash
 GOOD_TAG=<previous-working-tag>
-yq eval ".images[0].newTag = \"$GOOD_TAG\"" -i environments/prod/kustomization.yaml
-git add environments/prod/kustomization.yaml
+yq eval ".images[0].newTag = \"$GOOD_TAG\"" -i environments/prod/$SERVICE/kustomization.yaml
+git add environments/prod/$SERVICE/kustomization.yaml
 git commit -m "rollback prod to $GOOD_TAG"
 git push
 ```
@@ -113,13 +119,13 @@ kubectl rollout undo deployment/java-sample-app --to-revision=<N>
 
 ### Git revert (recommended)
 
-Same as prod Option 2: revert `environments/dev/kustomization.yaml` to last known good tag.
+Same as prod Option 2: revert `environments/dev/$SERVICE/kustomization.yaml` to last known good tag.
 
 ```bash
 cd terasky-platform-ha
 GOOD_TAG=<previous-working-tag>
-yq eval ".images[0].newTag = \"$GOOD_TAG\"" -i environments/dev/kustomization.yaml
-git add environments/dev/kustomization.yaml
+yq eval ".images[0].newTag = \"$GOOD_TAG\"" -i environments/dev/$SERVICE/kustomization.yaml
+git add environments/dev/$SERVICE/kustomization.yaml
 git commit -m "rollback dev to $GOOD_TAG"
 git push
 ```

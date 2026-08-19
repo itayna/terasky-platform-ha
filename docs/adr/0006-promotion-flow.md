@@ -12,14 +12,14 @@ environments.
 
 ## Decision
 
-- **Dev**: the last job of `delivery.yml` rewrites `newTag` in
-  `environments/dev/kustomization.yaml` and pushes to `main`. Every green build
-  reaches dev with no human involved.
+- **Dev**: the last job of the shared pipeline rewrites `newTag` in
+  `environments/dev/<service>/kustomization.yaml` and pushes to `main`. Every
+  green build reaches dev with no human involved.
 - **Prod**: CI never writes to `environments/prod`. A `workflow_dispatch`
-  workflow in this repository (`.github/workflows/promote-prod.yml`) takes a tag
-  — defaulting to whatever dev currently runs — re-runs `cosign verify` against
-  the pinned OIDC identity, and opens a PR changing the prod tag. Merging the PR
-  is the deployment.
+  workflow in this repository (`.github/workflows/promote-prod.yml`) takes a
+  service and a tag — the tag defaulting to whatever that service currently runs
+  in dev — re-runs `cosign verify` against the pinned OIDC identity, and opens a
+  PR changing the prod tag. Merging the PR is the deployment.
 
 ## Consequences
 

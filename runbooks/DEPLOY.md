@@ -2,14 +2,21 @@
 
 Image promotion workflow from dev to prod.
 
+Every command below is per service. Set it once:
+
+```bash
+SERVICE=java-sample-app
+```
+
 ## Overview
 
-Automated CI pipeline (GitHub Actions in `java-sample-app` repo):
+Automated CI pipeline (the shared reusable workflow in `platform-workflows`,
+called by each service's three-line `delivery.yml`):
 1. Build + test on push to `main`
 2. Trivy scan for vulnerabilities
 3. Build and push image to GHCR with SHA tag
 4. Sign image with Cosign (keyless)
-5. Update `terasky-platform-ha/environments/dev/kustomization.yaml` with new tag
+5. Update `terasky-platform-ha/environments/dev/$SERVICE/kustomization.yaml` with new tag
 6. Commit and push to trigger ArgoCD sync
 
 Manual prod promotion:
@@ -53,10 +60,10 @@ cd terasky-platform-ha
 git checkout -b promote-to-prod-<sha>
 
 # Copy dev tag to prod
-DEV_TAG=$(yq eval '.images[0].newTag' environments/dev/kustomization.yaml)
-yq eval ".images[0].newTag = \"$DEV_TAG\"" -i environments/prod/kustomization.yaml
+DEV_TAG=$(yq eval '.images[0].newTag' environments/dev/$SERVICE/kustomization.yaml)
+yq eval ".images[0].newTag = \"$DEV_TAG\"" -i environments/prod/$SERVICE/kustomization.yaml
 
-git add environments/prod/kustomization.yaml
+git add environments/prod/$SERVICE/kustomization.yaml
 git commit -m "promote $DEV_TAG to prod"
 git push -u origin promote-to-prod-<sha>
 
