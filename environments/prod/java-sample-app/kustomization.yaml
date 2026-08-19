@@ -6,8 +6,6 @@ namespace: default
 resources:
 - rollout.yaml
 - service.yaml
-- analysis-template.yaml
-- sealed-secret-ghcr.yaml
 
 images:
 - name: ghcr.io/itayna/java-sample-app

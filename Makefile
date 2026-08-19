@@ -3,7 +3,7 @@ DEV_CTX  := kind-kind-dev
 PROD_CTX := kind-kind-prod
 REPO_URL := git@github.com:itayna/terasky-platform-ha.git
 
-.PHONY: help bootstrap bootstrap-dev bootstrap-prod repo-secret apps status passwords clean
+.PHONY: help bootstrap bootstrap-dev bootstrap-prod repo-secret apps onboard status passwords clean
 
 help:
 	@grep -hE '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/\t/' | expand -t26
@@ -29,9 +29,13 @@ repo-secret: ## Give Argo CD read access to this repo (DEPLOY_KEY=~/.ssh/key)
 	    argocd.argoproj.io/secret-type=repository --overwrite ; \
 	done
 
-apps: ## Register the dev and prod Argo CD Applications
-	kubectl --context $(DEV_CTX)  apply -f gitops/argocd-apps/dev-app.yaml
-	kubectl --context $(PROD_CTX) apply -f gitops/argocd-apps/prod-app.yaml
+apps: ## Register the two root Applications (once per cluster, ever)
+	kubectl --context $(DEV_CTX)  apply -f gitops/argocd-apps/root-dev.yaml
+	kubectl --context $(PROD_CTX) apply -f gitops/argocd-apps/root-prod.yaml
+
+onboard: ## Scaffold a service onto the paved road (SERVICE=name [OWNER=handle])
+	@test -n "$(SERVICE)" || { echo "usage: make onboard SERVICE=my-service [OWNER=gh-handle]"; exit 1; }
+	bin/platformctl new $(SERVICE) $(if $(OWNER),--owner $(OWNER),) $(ONBOARD_FLAGS)
 
 status: ## Sync/health of both environments
 	@for ctx in $(DEV_CTX) $(PROD_CTX); do \

@@ -1,0 +1,17 @@
+name: delivery
+
+# The pipeline itself lives in __OWNER__/platform-workflows and is shared by
+# every service on the platform's paved road. Mandatory steps (scans, SBOM,
+# signing) are added there and arrive here by tag, so this file stays three
+# lines of configuration instead of a copy that drifts.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  delivery:
+    uses: __OWNER__/platform-workflows/.github/workflows/java-service-delivery.yml@v1
+    with:
+      service-name: __SERVICE__
+    secrets:
+      PLATFORM_REPO_DEPLOY_KEY: ${{ secrets.PLATFORM_REPO_DEPLOY_KEY }}

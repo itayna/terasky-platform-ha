@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: default
+
+# Shared platform primitives for prod. See environments/dev/_platform for why
+# the pull secret is here instead of in each service directory.
+#
+# health-check is a ClusterAnalysisTemplate: the canary abort criteria are a
+# platform decision, defined once, referenced by every service's Rollout with
+# clusterScope: true. A namespaced copy per service would collide in the shared
+# default namespace and would let each team quietly weaken its own gate.
+resources:
+- sealed-secret-ghcr.yaml
+- cluster-analysis-template.yaml

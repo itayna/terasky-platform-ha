@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# platformctl — the paved road's front door.
+#
+#   platformctl new <service> [--owner <gh-handle>] [--dry-run] [--no-repo]
+#
+# Creates the service repository from the reference app, generates its dev and
+# prod manifests plus both Argo CD Applications from templates/service-v1, adds
+# it to the catalog, and opens one pull request on this repository. Merging that
+# PR is what deploys it: the root app-of-apps picks up the new child Application
+# without anyone running kubectl.
+#
+# Deliberately not idempotent-by-overwrite: it refuses if the service is already
+# in the catalog. Re-onboarding a live service is a manifest edit, not a scaffold.
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEMPLATE="${REPO_ROOT}/templates/service-v1"
+CATALOG="${REPO_ROOT}/catalog/services.yaml"
+REFERENCE_REPO="java-sample-app"   # the repo new service repos are created from
+
+die() { echo "error: $*" >&2; exit 1; }
+
+usage() {
+  sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  exit "${1:-1}"
+}
+
+[ $# -gt 0 ] || usage
+[ "$1" = "new" ] || usage
+shift
+
+SERVICE=""
+OWNER="${PLATFORM_OWNER:-itayna}"
+DRY_RUN=false
+MAKE_REPO=true
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --owner)   OWNER="${2:?--owner needs a value}"; shift 2 ;;
+    --dry-run) DRY_RUN=true; shift ;;
+    --no-repo) MAKE_REPO=false; shift ;;
+    -h|--help) usage 0 ;;
+    -*)        die "unknown flag $1" ;;
+    *)         [ -z "$SERVICE" ] || die "one service at a time"; SERVICE="$1"; shift ;;
+  esac
+done
+[ -n "$SERVICE" ] || usage
+
+# Becomes a Kubernetes object name, an image name and a DNS label.
+[[ "$SERVICE" =~ ^[a-z][a-z0-9-]{1,38}[a-z0-9]$ ]] \
+  || die "'$SERVICE' must be lowercase alphanumeric with dashes, 3-40 chars"
+if grep -q "^- name: ${SERVICE}$" "$CATALOG"; then
+  die "$SERVICE is already in the catalog"
+fi
+
+render() {  # render <template-file> <destination>
+  mkdir -p "$(dirname "$2")"
+  sed -e "s/__SERVICE__/${SERVICE}/g" -e "s/__OWNER__/${OWNER}/g" "$1" > "$2"
+}
+
+# --- generate into the working tree (or a scratch copy for --dry-run) ---------
+OUT="$REPO_ROOT"
+if $DRY_RUN; then
+  OUT="$(mktemp -d)"
+  trap 'rm -rf "$OUT"' EXIT
+fi
+
+for env in dev prod; do
+  for f in "$TEMPLATE/$env"/*.yaml; do
+    render "$f" "$OUT/environments/$env/$SERVICE/$(basename "$f")"
+  done
+  render "$TEMPLATE/gitops/$env.yaml" "$OUT/gitops/argocd-apps/$env/$SERVICE.yaml"
+done
+
+if $DRY_RUN; then
+  echo "==> would create:"
+  (cd "$OUT" && find environments gitops -type f | sort | sed 's/^/    /')
+  echo
+  echo "==> $(basename "$CATALOG") entry:"
+  printf '    - name: %s\n      repo: %s/%s\n' "$SERVICE" "$OWNER" "$SERVICE"
+  echo
+  echo "==> rendered dev Deployment:"
+  sed 's/^/    /' "$OUT/environments/dev/$SERVICE/deployment.yaml"
+  exit 0
+fi
+
+python3 - "$CATALOG" "$SERVICE" "$OWNER" <<'PY'
+import sys, datetime, pathlib
+catalog, service, owner = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+entry = f"- name: {service}\n  repo: {owner}/{service}\n  onboarded: {datetime.date.today()}\n"
+catalog.write_text(catalog.read_text().rstrip("\n") + "\n" + entry)
+PY
+
+# --- the service repository ---------------------------------------------------
+if $MAKE_REPO; then
+  command -v gh >/dev/null || die "gh is required (or pass --no-repo)"
+  WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+  # Created from the reference app so a new service starts with a working Maven
+  # build, Dockerfile and Actuator probes — the pipeline's assumptions — rather
+  # than an empty repository the team has to make pipeline-shaped by hand.
+  ( cd "$WORK" && gh repo create "$OWNER/$SERVICE" --public --clone \
+      --template "$OWNER/$REFERENCE_REPO" \
+      --description "Service on the TeraSky platform paved road" )
+  render "$TEMPLATE/repo/.github/workflows/delivery.yml" "$WORK/$SERVICE/.github/workflows/delivery.yml"
+  render "$TEMPLATE/repo/CODEOWNERS" "$WORK/$SERVICE/CODEOWNERS"
+  git -C "$WORK/$SERVICE" add -A
+  git -C "$WORK/$SERVICE" commit -qm "onboard $SERVICE onto the platform paved road"
+  git -C "$WORK/$SERVICE" push -q
+
+  # The pipeline's one secret: write access to this repository, so it can commit
+  # the dev tag. Without it the service builds and signs but never deploys.
+  if [ -n "${PLATFORM_DEPLOY_KEY:-}" ]; then
+    gh secret set PLATFORM_REPO_DEPLOY_KEY --repo "$OWNER/$SERVICE" < "$PLATFORM_DEPLOY_KEY"
+  else
+    NEEDS_SECRET=1
+  fi
+fi
+
+# --- one pull request on this repository --------------------------------------
+BRANCH="onboard/$SERVICE"
+git -C "$REPO_ROOT" checkout -q -b "$BRANCH"
+git -C "$REPO_ROOT" add -A "environments/dev/$SERVICE" "environments/prod/$SERVICE" \
+  "gitops/argocd-apps/dev/$SERVICE.yaml" "gitops/argocd-apps/prod/$SERVICE.yaml" "$CATALOG"
+git -C "$REPO_ROOT" commit -qm "onboard $SERVICE"
+git -C "$REPO_ROOT" push -q -u origin "$BRANCH"
+gh pr create --repo "$OWNER/terasky-platform-ha" --base main --head "$BRANCH" \
+  --title "onboard $SERVICE" \
+  --body "Generated by \`platformctl new $SERVICE\` from \`templates/service-v1\`.
+
+Merging registers \`$SERVICE\` with the dev and prod root Applications. Dev deploys
+on the service's first green pipeline; prod stays on \`awaiting-first-promotion\`
+until someone runs the promotion workflow."
+
+echo
+echo "==> $SERVICE scaffolded. Remaining human steps:"
+echo "    1. review and merge the pull request opened above"
+if [ -n "${NEEDS_SECRET:-}" ]; then
+  echo "    2. gh secret set PLATFORM_REPO_DEPLOY_KEY --repo $OWNER/$SERVICE < <deploy-key>"
+  echo "       (export PLATFORM_DEPLOY_KEY=<path> to have platformctl do this)"
+fi

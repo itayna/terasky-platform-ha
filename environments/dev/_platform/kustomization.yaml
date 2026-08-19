@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: default
+
+# Shared platform primitives for this environment, owned by the platform team
+# and synced by its own Argo CD Application. Anything in here is a resource a
+# service needs but should not have to author, seal, or maintain a copy of.
+#
+# The GHCR pull secret lives here rather than in each service directory so that
+# onboarding a service is a pull request and nothing else: no kubeseal, no
+# cluster credentials, no platform-team action. A sealed secret is encrypted to
+# one cluster's key, so it cannot be templated per service anyway.
+resources:
+- sealed-secret-ghcr.yaml

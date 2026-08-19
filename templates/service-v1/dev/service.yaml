@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: __SERVICE__
+  labels:
+    app: __SERVICE__
+    env: dev
+spec:
+  type: ClusterIP
+  selector:
+    app: __SERVICE__
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
