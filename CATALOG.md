@@ -6,7 +6,7 @@ deployed where, and whether it still meets the platform bar.
 
 | Service | Owner | Pipeline | Dev tag | Signed | SBOM | GitOps | Prod tag | Promoted via PR |
 |---|---|---|---|---|---|---|---|---|
-| `java-sample-app` | @itayna | ✅ v1 | `bc35f2ec0a3b` | ✅ | ❌ | ✅ | `bc35f2ec0a3b` | ✅ |
+| `java-sample-app` | @itayna | ✅ v1 | `85cadd62abe7` | ✅ | ❌ | ✅ | `bc35f2ec0a3b` | ✅ |
 
 Signed = cosign verify against the platform pipeline's OIDC identity.
 SBOM = SPDX document attached to the deployed image.
