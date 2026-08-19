@@ -26,11 +26,24 @@ spec:
           - default
     verifyImages:
     - imageReferences:
-      - "ghcr.io/itayna/java-sample-app:*"
+      - "ghcr.io/itayna/*"
       attestors:
-      - entries:
+      # count: 1 makes these alternatives, not both-required. Entry 1 is the
+      # steady state: every service is built and signed by the platform's
+      # reusable pipeline, so onboarding service #20 needs no policy edit —
+      # which is the whole point of the golden path. Entry 2 is the migration
+      # remnant for images signed by a service's own pre-v1 delivery.yml; it
+      # exists so a rollback to one of those images still admits. Delete it
+      # once no pre-v1 image is a rollback candidate (see ADR-0008).
+      - count: 1
+        entries:
         - keyless:
-            subject: "https://github.com/itayna/java-sample-app/.github/workflows/delivery.yml@refs/heads/main"
+            subject: "https://github.com/itayna/platform-workflows/.github/workflows/java-service-delivery.yml@refs/tags/v*"
+            issuer: "https://token.actions.githubusercontent.com"
+            rekor:
+              url: https://rekor.sigstore.dev
+        - keyless:
+            subject: "https://github.com/itayna/*/.github/workflows/delivery.yml@refs/heads/main"
             issuer: "https://token.actions.githubusercontent.com"
             rekor:
               url: https://rekor.sigstore.dev
