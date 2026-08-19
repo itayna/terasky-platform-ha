@@ -3,6 +3,18 @@ kind: ClusterPolicy
 metadata:
   name: verify-image-signatures
   annotations:
+    # Verify Pods only. With autogen on, Kyverno also generates a rule for
+    # Deployment/StatefulSet/DaemonSet/CronJob, and mutateDigest rewrites the
+    # *controller's* pod template to tag@sha256:... That made every dev
+    # Deployment permanently drift from Git, which was papered over with an
+    # `ignoreDifferences` on the image field in the dev Application — and that
+    # in turn hid genuine `newTag` bumps, so Argo CD stayed "Synced", never
+    # auto-synced, and automated dev promotion silently stopped deploying.
+    # Pods still get signature-verified and digest-pinned at creation; the only
+    # thing lost is rejection at Deployment-apply time instead of at pod
+    # creation, which is already how the prod Rollout behaves (a CRD is never
+    # autogen'd). See ADR-0011.
+    pod-policies.kyverno.io/autogen-controllers: none
     policies.kyverno.io/title: Verify Image Signatures
     policies.kyverno.io/category: Supply Chain Security
     policies.kyverno.io/severity: high
