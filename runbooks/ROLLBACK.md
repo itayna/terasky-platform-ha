@@ -2,6 +2,42 @@
 
 Manual and automatic rollback procedures.
 
+## Speed, trigger, and in-flight traffic
+
+| Tier | Speed | Trigger |
+|---|---|---|
+| Automatic canary abort | seconds — 3 consecutive non-`UP` `/actuator/health` reads (~90s of polling) | `AnalysisRun` in `_platform`, no human involved |
+| Manual `rollouts abort` / `undo` | seconds | operator decision, still-rolling or fully-promoted bad image |
+| Revert platform config commit | one Argo CD sync interval (~3 min, or `argocd app sync` to force it) | operator decision |
+| Move `v1` back a minor | next push per service | platform-team decision |
+
+**In-flight traffic** during abort or undo: there is no service mesh here (deliberately out of
+scope, see README), so canary traffic split is plain Kubernetes `Service` endpoint weighting —
+roughly proportional to how many canary vs. stable pods exist, not a real percentage-based split.
+On abort, Argo Rollouts removes the canary pods from the `Service`'s endpoints immediately, so no
+*new* connections reach them; requests already in flight to a canary pod finish or fail per that
+pod's `terminationGracePeriodSeconds` (default 30s) rather than being cut instantly. Nothing is
+retried automatically — a request in flight when its pod is torn down surfaces as a client-side
+error, which is why the abort condition is 3 consecutive failures rather than 1: it trades a few
+more bad requests for not aborting on a single flaky health check.
+
+## Image rollback vs. a database-adjacent change
+
+`rollouts undo` / `git revert` only ever change which **image** runs — they do not, and cannot,
+undo a database migration. Treat the two as separate failure classes:
+
+- **Bad image, schema unchanged** — the case this repo automates. Undo/abort is safe and
+  sufficient; the previous image is compatible with the current schema by definition.
+- **Bad image that shipped a destructive migration** (dropped/renamed a column, backfill that
+  overwrote data) — rolling the image back is *not* safe on its own: the old code may now query a
+  column that no longer exists, or the schema may be silently wrong for it. This platform has no
+  migration tooling yet (no service here owns a database — see FUTURE.md), so the documented
+  policy is: only ever ship migrations as expand/contract (add-nullable-column now, backfill,
+  switch reads, drop-old-column in a *later* release) so an image rollback is always
+  schema-compatible. A genuinely destructive migration is not undone by GitOps at all — it needs a
+  restore from backup or a forward-fix release, both slower and riskier than an image rollback, and
+  both outside what `kubectl argo rollouts undo` does for you.
+
 Every command below is per service. Set it once:
 
 ```bash
