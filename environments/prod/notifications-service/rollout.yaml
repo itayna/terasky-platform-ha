@@ -71,5 +71,5 @@ spec:
           clusterScope: true
         args:
         - name: service-name
-          value: notifications-service-canary
+          value: notifications-service-canary.default.svc.cluster.local
       abortScaleDownDelaySeconds: 30

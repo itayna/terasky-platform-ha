@@ -71,5 +71,5 @@ spec:
           clusterScope: true
         args:
         - name: service-name
-          value: __SERVICE__-canary
+          value: __SERVICE__-canary.default.svc.cluster.local
       abortScaleDownDelaySeconds: 30

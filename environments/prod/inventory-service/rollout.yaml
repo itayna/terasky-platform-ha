@@ -71,5 +71,5 @@ spec:
           clusterScope: true
         args:
         - name: service-name
-          value: inventory-service-canary
+          value: inventory-service-canary.default.svc.cluster.local
       abortScaleDownDelaySeconds: 30

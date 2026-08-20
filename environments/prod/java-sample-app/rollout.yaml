@@ -71,5 +71,5 @@ spec:
           clusterScope: true
         args:
         - name: service-name
-          value: java-sample-app-canary
+          value: java-sample-app-canary.default.svc.cluster.local
       abortScaleDownDelaySeconds: 30
