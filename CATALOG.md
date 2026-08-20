@@ -7,7 +7,7 @@ deployed where, and whether it still meets the platform bar.
 | Service | Owner | Pipeline | Dev tag | Signed | SBOM | GitOps | Prod tag | Promoted via PR |
 |---|---|---|---|---|---|---|---|---|
 | `java-sample-app` | @itayna | ✅ v1 | `0541d4675efd` | ✅ | ✅ | ✅ | `bc35f2ec0a3b` | ✅ |
-| `notifications-service` | @itayna | ✅ v1 | `awaiting-first-build` | ❌ | ❌ | ✅ | `awaiting-first-promotion` | — not in prod |
+| `notifications-service` | @itayna | ✅ v1 | `a7afc98f508a` | ✅ | ✅ | ✅ | `awaiting-first-promotion` | — not in prod |
 | `inventory-service` | @itayna | ✅ v1 | `awaiting-first-build` | ❌ | ❌ | ✅ | `awaiting-first-promotion` | — not in prod |
 
 Signed = cosign verify against the platform pipeline's OIDC identity.
