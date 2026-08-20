@@ -6,9 +6,9 @@ deployed where, and whether it still meets the platform bar.
 
 | Service | Owner | Pipeline | Dev tag | Signed | SBOM | GitOps | Prod tag | Promoted via PR |
 |---|---|---|---|---|---|---|---|---|
-| `java-sample-app` | @itayna | ✅ v1 | `0541d4675efd` | ✅ | ✅ | ✅ | `bc35f2ec0a3b` | ✅ |
-| `notifications-service` | @itayna | ✅ v1 | `a7afc98f508a` | ✅ | ✅ | ✅ | `awaiting-first-promotion` | — not in prod |
-| `inventory-service` | @itayna | ✅ v1 | `cfe67b828600` | ✅ | ✅ | ✅ | `awaiting-first-promotion` | — not in prod |
+| `java-sample-app` | @itayna | ✅ v1 | `4c83cb77409e` | ✅ | ✅ | ✅ | `bc35f2ec0a3b` | ✅ |
+| `notifications-service` | @itayna | ✅ v1 | `b5370e68d48a` | ✅ | ✅ | ✅ | `awaiting-first-promotion` | — not in prod |
+| `inventory-service` | @itayna | ✅ v1 | `a93e92b867d7` | ✅ | ✅ | ✅ | `awaiting-first-promotion` | — not in prod |
 
 Signed = cosign verify against the platform pipeline's OIDC identity.
 SBOM = SPDX document attached to the deployed image.
