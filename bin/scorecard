@@ -7,6 +7,7 @@
 # Every row is derived from a source of truth, never from the catalog:
 #   owner     the service repository's CODEOWNERS
 #   pipeline  the version its delivery.yml pins
+#   lint      the Checkstyle gate bound in its pom
 #   signed    cosign verify against the platform pipeline's OIDC identity
 #   sbom      an SBOM attached to the deployed image
 #   gitops    Argo CD Applications with selfHeal, probes, and canary analysis
@@ -60,6 +61,13 @@ while read -r svc repo; do
     *)  pipeline_cell="⚠️ ${pinned}" ;;
   esac
 
+  # Lint and the rest of the build gate live in the service's own pom, so unlike
+  # Trivy or signing they do not arrive by moving the pipeline tag. A repository
+  # scaffolded before the gate existed keeps building without it, silently. This
+  # column is what turns that drift into a failing check.
+  gh api "repos/${repo}/contents/pom.xml" -H "Accept: application/vnd.github.raw" 2>/dev/null \
+    | grep -q maven-checkstyle-plugin && lint=0 || lint=1
+
   if $COSIGN; then
     cosign verify "${image}:${dev_tag}" \
       --certificate-identity-regexp="$(identity_regexp "$svc")" \
@@ -90,8 +98,8 @@ while read -r svc repo; do
     promoted='❌'; FAILED=1
   fi
 
-  [ "$signed" != 1 ] && [ "$sbom" != 1 ] && [ $gitops = 0 ] || FAILED=1
-  rows+="| \`${svc}\` | ${owner_cell} | ${pipeline_cell} | \`${dev_tag}\` | $(mark $signed) | $(mark $sbom) | $(mark $gitops) | \`${prod_tag}\` | ${promoted} |"$'\n'
+  [ "$signed" != 1 ] && [ "$sbom" != 1 ] && [ $gitops = 0 ] && [ $lint = 0 ] || FAILED=1
+  rows+="| \`${svc}\` | ${owner_cell} | ${pipeline_cell} | $(mark $lint) | \`${dev_tag}\` | $(mark $signed) | $(mark $sbom) | $(mark $gitops) | \`${prod_tag}\` | ${promoted} |"$'\n'
 done < <(awk '/^- name:/{n=$3} /^[[:space:]]+repo:/{print n, $2}' catalog/services.yaml)
 
 {
@@ -101,10 +109,12 @@ done < <(awk '/^- name:/{n=$3} /^[[:space:]]+repo:/{print n, $2}' catalog/servic
   echo "Argo CD UI; this is the compliance view: what exists, who owns it, what is"
   echo "deployed where, and whether it still meets the platform bar."
   echo
-  echo "| Service | Owner | Pipeline | Dev tag | Signed | SBOM | GitOps | Prod tag | Promoted via PR |"
-  echo "|---|---|---|---|---|---|---|---|---|"
+  echo "| Service | Owner | Pipeline | Lint | Dev tag | Signed | SBOM | GitOps | Prod tag | Promoted via PR |"
+  echo "|---|---|---|---|---|---|---|---|---|---|"
   printf '%s' "$rows"
   echo
+  echo "Lint = the service's pom binds the platform's Checkstyle gate, so the shared"
+  echo "pipeline's \`mvn -B verify\` fails the build on a violation."
   echo "Signed = cosign verify against the platform pipeline's OIDC identity."
   echo "SBOM = SPDX document attached to the deployed image."
   echo "GitOps = Argo CD Applications with selfHeal for both environments, probes"

@@ -80,7 +80,62 @@ report zero services, and it argues for running platform tooling in CI where the
 runner is known.
 
 **`gh repo create --template ... -- <path>`.** Invented flag syntax. Corrected to
-`cd` into a scratch directory and let `gh` clone into `./<service>`.
+`cd` into a scratch directory and let `gh` clone into `./<service>` — and later
+removed entirely, see the next entry.
+
+**Onboarding's first CI run built the wrong service's image.** Every service
+scaffolded from the reference app had exactly one failed run at the top of its
+history, before the run for its own onboarding commit. The model had read this as
+the deploy-key race it had just fixed. It is a second, independent bug:
+`gh repo create --template` publishes the template's *initial commit* the instant
+the repository exists, and that commit carries `java-sample-app`'s own
+`delivery.yml`. GitHub queued a delivery run for it before `platformctl` could
+render this service's copy, so the run built and would have signed
+`ghcr.io/itayna/java-sample-app` under the new repository's SHA — and `promote-dev`
+would then have retagged `java-sample-app` in dev from an unrelated repository's
+source. It only ever failed because GHCR denied the cross-package write:
+
+```
+#23 ERROR: failed to push ghcr.io/itayna/java-sample-app:a884253c41f9:
+denied: permission_denied: write_package
+```
+
+Diagnosed from the run log plus `gh api repos/itayna/inventory-service/commits`,
+which shows `Initial commit` two seconds ahead of the onboarding commit, each with
+its own run. Both `notifications-service` and `inventory-service` show the identical
+pair, which is what separated a systemic scaffold defect from one-off noise.
+
+My own first fix was wrong too, and worth recording: disable Actions on the new
+repository immediately after creating it, then re-enable after rendering. That
+loses the race by construction — the run is already queued when `gh repo create`
+returns. The fix is to stop creating a repository that has content before we
+control it: clone the reference app locally, render `delivery.yml`, commit, *then*
+create the remote and push, so the first commit `main` ever sees already names the
+right service. Belt and braces on the platform side, because a copied
+`delivery.yml` can reintroduce this by hand: the shared pipeline (v1.4) now refuses
+a `service-name` that is not the calling repository's name, before anything builds.
+
+**Lint was missing and nobody noticed.** The pipeline ran `mvn -B verify` and the
+README described a build-and-test gate, so "lint" read as covered. It was not: the
+reference `pom.xml` had no static-analysis plugin at all, which `mvn -B verify`
+happily reports as success. Added Checkstyle bound to `validate`, and verified the
+gate the only way that means anything — added an unused import, watched the build
+fail with `UnusedImports`, reverted it, watched it pass. The model's first ruleset
+was `google_checks.xml`, which fails this repository's existing code on hundreds of
+formatting violations; a gate the first team to hit it turns off is worse than no
+gate, so the rules are defect-only.
+
+The gate then broke the image build, which is the more interesting half. `mvn -B
+verify` passed in CI and the Docker build failed on the next line:
+`Unable to find configuration file at location: checkstyle.xml`. The Dockerfile
+copies `pom.xml` and `src/`, nothing else, and the in-image `mvn package` runs
+`validate` — so it executed the new gate without its ruleset. Neither the model nor
+I predicted it; the first live run did. Fixed by copying `checkstyle.xml` into the
+build stage, verified by adding an unused import and watching `docker build` fail
+with `UnusedImports`. Two things worth recording: the same defect was live in both
+services scaffolded from the reference app, so it was fixed in all three rather than
+in the one whose run I happened to read; and a gate that only runs outside the
+container is a gate that a `docker build` on a laptop skips silently.
 
 ## Where I overrode a working answer
 

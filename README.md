@@ -19,7 +19,7 @@ Everything here runs on free, open-source tooling against local `kind` clusters.
           │                                      │ platform-workflows (public)   │
           ▼                                      │  java-service-delivery.yml @v1│
 ┌──────────────────────────────────┐  uses: @v1  │                               │
-│ <service> repo    delivery.yml   │────────────▶│ build+test ─▶ Trivy fs        │
+│ <service> repo    delivery.yml   │────────────▶│ lint+test ─▶ Trivy fs         │
 │  (3 lines: uses + service-name)  │             │ buildx amd64+arm64 ─▶ Trivy   │
 └──────────────────────────────────┘             │ SBOM (SPDX) ─▶ cosign sign    │
                                                  │ commit dev tag ──────────┐    │
@@ -121,8 +121,11 @@ stays the Argo CD UI.
 
 1. **Commit** lands on `main` in the service repository.
 2. **CI** is three lines of `uses:` pointing at
-   `platform-workflows/.github/workflows/java-service-delivery.yml@v1`. It runs
-   `mvn -B verify`, then a Trivy filesystem scan that fails the build on any
+   `platform-workflows/.github/workflows/java-service-delivery.yml@v1`. It checks
+   that `service-name` matches the calling repository — a `delivery.yml` copied
+   from another service would otherwise build and sign that service's image name
+   from this source — then runs `mvn -B verify`, which lints (Checkstyle, bound to
+   `validate`) and tests, then a Trivy filesystem scan that fails the build on any
    CRITICAL finding.
 3. **Image** is built with buildx for `linux/amd64` and `linux/arm64`, pushed to
    GHCR as `:<12-char-sha>` — never `:latest`, so every deployed state is

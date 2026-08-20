@@ -239,6 +239,7 @@ bin/scorecard            # writes CATALOG.md, exits 1 on any red row
 | Owner `❌ none` | no `CODEOWNERS` in the service repository | add `* @handle`; it is the ownership of record, not decoration |
 | Pipeline `❌ own copy` | the service has its own copy of the pipeline, so platform-mandated steps never reach it | replace `.github/workflows/delivery.yml` with the template stub |
 | Pipeline `⚠️ v1.0` | deliberately pinned behind the floating tag | fine short-term; the warning is the point — move it to `@v1` when the team can |
+| Lint `❌` | the service's `pom.xml` does not bind the Checkstyle gate, so `mvn -B verify` passes without linting | copy `checkstyle.xml` and the plugin block from `itayna/java-sample-app`. This column exists because build-gate changes live in the service repo and, unlike pipeline steps, do **not** arrive by moving `@v1` |
 | Signed `❌` | `cosign verify` failed for the dev tag against the pipeline identity | the image was built by something else. Check the run that produced it; re-push to rebuild through the pipeline |
 | SBOM `❌` | no SPDX document attached to that tag | usually the same cause as Signed; an image predating the SBOM step also fails and should be rebuilt |
 | GitOps `❌` | a missing child `Application`, `selfHeal` off, no `readinessProbe`, or the Rollout does not reference `health-check` | compare against `templates/service-v1/`; all four are rendered correctly by `platformctl` |

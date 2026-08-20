@@ -78,6 +78,10 @@ if $DRY_RUN; then
   echo "==> $(basename "$CATALOG") entry:"
   printf '    - name: %s\n      repo: %s/%s\n' "$SERVICE" "$OWNER" "$SERVICE"
   echo
+  echo "==> rendered delivery.yml (the service's whole CI):"
+  render "$TEMPLATE/repo/.github/workflows/delivery.yml" "$OUT/delivery.yml"
+  sed 's/^/    /' "$OUT/delivery.yml"
+  echo
   echo "==> rendered dev Deployment:"
   sed 's/^/    /' "$OUT/environments/dev/$SERVICE/deployment.yaml"
   exit 0
@@ -97,22 +101,41 @@ if $MAKE_REPO; then
   # Created from the reference app so a new service starts with a working Maven
   # build, Dockerfile and Actuator probes — the pipeline's assumptions — rather
   # than an empty repository the team has to make pipeline-shaped by hand.
-  ( cd "$WORK" && gh repo create "$OWNER/$SERVICE" --public --clone \
-      --template "$OWNER/$REFERENCE_REPO" \
-      --description "Service on the TeraSky platform paved road" )
+  # Cloned from the reference app, not created with `gh repo create --template`.
+  # Either way a new service starts with a working Maven build, Dockerfile, lint
+  # config and Actuator probes — the pipeline's assumptions — rather than an empty
+  # repository the team has to make pipeline-shaped by hand.
+  #
+  # The reason it is a clone: creating from a template pushes an "Initial commit"
+  # to main the instant the repository exists, and that commit carries the
+  # reference app's own delivery.yml. GitHub queues a delivery run for it before
+  # this script can render the new service's copy, so every onboarding produced one
+  # failed run that tried to build ghcr.io/<owner>/java-sample-app under the new
+  # repository's SHA. Disabling Actions after creation does not fix it — the run is
+  # already queued. Cloning, rendering, then creating the repository means the
+  # first commit main ever sees already names the right service.
+  git clone -q --depth 1 "https://github.com/$OWNER/$REFERENCE_REPO" "$WORK/$SERVICE"
+  rm -rf "$WORK/$SERVICE/.git"   # a new service does not inherit the reference app's history
   render "$TEMPLATE/repo/.github/workflows/delivery.yml" "$WORK/$SERVICE/.github/workflows/delivery.yml"
   render "$TEMPLATE/repo/CODEOWNERS" "$WORK/$SERVICE/CODEOWNERS"
+  git -C "$WORK/$SERVICE" init -q -b main
   git -C "$WORK/$SERVICE" add -A
   git -C "$WORK/$SERVICE" commit -qm "onboard $SERVICE onto the platform paved road"
-  git -C "$WORK/$SERVICE" push -q
+  # --source without --push: create the remote and wire up origin, push below.
+  gh repo create "$OWNER/$SERVICE" --public --source "$WORK/$SERVICE" --remote origin \
+    --description "Service on the TeraSky platform paved road"
 
   # The pipeline's one secret: write access to this repository, so it can commit
-  # the dev tag. Without it the service builds and signs but never deploys.
+  # the dev tag. Must be set BEFORE the push below — push triggers the delivery
+  # workflow immediately, and a run that starts before the secret exists fails
+  # promote-dev's checkout of terasky-platform-ha with a 404.
   if [ -n "${PLATFORM_DEPLOY_KEY:-}" ]; then
     gh secret set PLATFORM_REPO_DEPLOY_KEY --repo "$OWNER/$SERVICE" < "$PLATFORM_DEPLOY_KEY"
   else
     NEEDS_SECRET=1
   fi
+
+  git -C "$WORK/$SERVICE" push -q -u origin main
 fi
 
 # --- one pull request on this repository --------------------------------------
