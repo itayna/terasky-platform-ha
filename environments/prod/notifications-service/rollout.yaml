@@ -1,0 +1,75 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: notifications-service
+  labels:
+    app: notifications-service
+    env: prod
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: notifications-service
+  template:
+    metadata:
+      labels:
+        app: notifications-service
+        env: prod
+    spec:
+      imagePullSecrets:
+      - name: ghcr-pull-secret
+      containers:
+      - name: app
+        image: ghcr.io/itayna/notifications-service:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: APP_NAME
+          value: "notifications-service (prod)"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+  strategy:
+    canary:
+      maxSurge: 1
+      maxUnavailable: 0
+      steps:
+      - setWeight: 20
+      - pause: {duration: 2m}
+      - setWeight: 40
+      - pause: {duration: 2m}
+      - setWeight: 60
+      - pause: {duration: 2m}
+      - setWeight: 80
+      - pause: {duration: 2m}
+      canaryService: notifications-service-canary
+      stableService: notifications-service
+      analysis:
+        startingStep: 1
+        templates:
+        - templateName: health-check
+          clusterScope: true
+        args:
+        - name: service-name
+          value: notifications-service-canary
+      abortScaleDownDelaySeconds: 30

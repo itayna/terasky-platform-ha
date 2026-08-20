@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: default
+
+resources:
+- deployment.yaml
+- service.yaml
+
+images:
+- name: ghcr.io/itayna/notifications-service
+  # Written by the platform pipeline on every push to the service's main branch.
+  # Until the first build lands this tag does not exist, so the Deployment sits
+  # in ImagePullBackOff — that is the correct state for a service that has never
+  # been built, and it clears itself on the first green pipeline.
+  newTag: awaiting-first-build
