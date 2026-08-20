@@ -13,4 +13,4 @@ images:
   # Until the first build lands this tag does not exist, so the Deployment sits
   # in ImagePullBackOff — that is the correct state for a service that has never
   # been built, and it clears itself on the first green pipeline.
-  newTag: cfe67b828600
+  newTag: a93e92b867d7
