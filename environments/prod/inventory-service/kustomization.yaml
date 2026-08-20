@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: default
+
+resources:
+- rollout.yaml
+- service.yaml
+
+images:
+- name: ghcr.io/itayna/inventory-service
+  # Only .github/workflows/promote-prod.yml writes this, never CI. A service
+  # that has never been promoted has no prod image, and the Rollout says so
+  # rather than silently running something nobody chose.
+  newTag: awaiting-first-promotion
