@@ -10,3 +10,6 @@ services:
 - name: java-sample-app
   repo: itayna/java-sample-app
   onboarded: 2026-08-18
+- name: notifications-service
+  repo: itayna/notifications-service
+  onboarded: 2026-08-20
