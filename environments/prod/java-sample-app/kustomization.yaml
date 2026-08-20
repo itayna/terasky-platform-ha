@@ -10,4 +10,4 @@ resources:
 images:
 - name: ghcr.io/itayna/java-sample-app
   # Promoted explicitly by .github/workflows/promote-prod.yml (never by CI).
-  newTag: bc35f2ec0a3b
+  newTag: 4c83cb77409e
