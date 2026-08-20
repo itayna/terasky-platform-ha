@@ -290,7 +290,8 @@ start rather than trying to unwind.
 | `error: <name> is already in the catalog` | re-running for a live service | intentional. Re-onboarding is a manifest edit, not a scaffold |
 | `gh: Name already exists on this account` | the service repository exists | `platformctl new <svc> --no-repo` to generate manifests only, or pick another name |
 | Branch and files exist, no PR | `gh pr create` failed (auth, or `main` moved) | the working tree is correct — push the branch and open the PR by hand |
-| PR merged, no pods in dev | the service has no image yet | expected: `newTag: awaiting-first-promotion`. The first push to the service repo produces the first image |
+| PR merged, no pods in dev | the service has no image yet | expected: `newTag: awaiting-first-build`. The first push to the service repo produces the first image |
+| Prod Application `Degraded` for a new service | expected until first promotion: `newTag: awaiting-first-promotion` has no image, so Kyverno cannot verify a signature and denies the Pod (`failed to verify image ... MANIFEST_UNKNOWN`) — the policy failing closed, not a pull failure | nothing to fix. It clears when someone runs `promote-prod`; `CATALOG.md` shows the service as `— not in prod` |
 | PR merged, Application missing in Argo CD | root app not registered on that cluster | `make apps` (once per cluster, ever), then `make status` |
 | Pods `ImagePullBackOff` | the shared GHCR pull secret is missing or sealed for the other cluster | `kubectl -n default get secret ghcr-pull`; reseal `environments/<env>/_platform/` for that cluster |
 | Pods denied at admission | the image is not signed by the pipeline identity | the service is probably still on a copied workflow — see the Pipeline column above |

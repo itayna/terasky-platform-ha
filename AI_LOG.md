@@ -137,6 +137,16 @@ services scaffolded from the reference app, so it was fixed in all three rather 
 in the one whose run I happened to read; and a gate that only runs outside the
 container is a gate that a `docker build` on a laptop skips silently.
 
+**A negative test that passed for the wrong reason.** Checking that admission really
+denies unsigned images, the obvious move — `kubectl run` a public `nginx` image — is
+worthless: the policy's `imageReferences` is `ghcr.io/itayna/*`, so nginx is out of
+scope and admitting it is correct behaviour. The pod was created and for a moment
+that read as "enforcement is off". The real evidence was already in the cluster:
+every never-promoted prod service is `Degraded` because Kyverno denies its Pod with
+`failed to verify image ghcr.io/itayna/<svc>:awaiting-first-promotion ...
+MANIFEST_UNKNOWN` — the policy failing closed on an image it cannot verify. Recorded
+because a negative test that passes for the wrong reason is worse than no test.
+
 ## Where I overrode a working answer
 
 **Onboarding required `kubeseal` and cluster access.** The model's scaffold sealed a
