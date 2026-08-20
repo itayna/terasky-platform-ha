@@ -13,3 +13,6 @@ services:
 - name: notifications-service
   repo: itayna/notifications-service
   onboarded: 2026-08-20
+- name: inventory-service
+  repo: itayna/inventory-service
+  onboarded: 2026-08-20
