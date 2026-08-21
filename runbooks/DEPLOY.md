@@ -32,8 +32,8 @@ Monitor via ArgoCD UI or CLI:
 
 ```bash
 kubectl config use-context kind-kind-dev
-kubectl argo cd app get java-sample-app-dev
-kubectl argo cd app sync java-sample-app-dev --prune
+argocd app get java-sample-app-dev
+argocd app sync java-sample-app-dev --prune
 ```
 
 Check pod rollout:
@@ -149,13 +149,14 @@ curl http://localhost:9080/actuator/health
 **ArgoCD not syncing after tag update**: Force refresh:
 
 ```bash
-kubectl argo cd app sync <app-name> --force
+argocd app sync <app-name> --force
 ```
 
-**Rollout stuck in canary**: Check analysis job logs:
+**Rollout stuck in canary**: Check the shared analysis run:
 
 ```bash
-kubectl logs -l analysisrun=$(kubectl get analysisrun -o name | tail -1 | cut -d/ -f2)
+kubectl get analysisrun -n _platform
+kubectl describe analysisrun <run-name> -n _platform
 ```
 
 Common causes:

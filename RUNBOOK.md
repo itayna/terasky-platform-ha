@@ -49,13 +49,14 @@ failed signature verification. Confirm from outside the cluster:
 
 ```bash
 cosign verify ghcr.io/itayna/java-sample-app:<tag> \
-  --certificate-identity-regexp="^https://github.com/itayna/java-sample-app/" \
-  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+  --certificate-identity-regexp='^https://github\.com/itayna/platform-workflows/\.github/workflows/java-service-delivery\.yml@refs/tags/v.*$' \
+  --certificate-oidc-issuer='https://token.actions.githubusercontent.com'
 ```
 
-If `cosign verify` passes but Kyverno denies, the mismatch is in the policy's
-pinned subject — a renamed workflow file or a non-`main` branch will do it
-([ADR-0005](docs/adr/0005-cosign-keyless-kyverno.md)).
+If `cosign verify` passes but Kyverno denies, compare its certificate identity
+and issuer with `clusters/policies/verify-image-signatures.yaml`. Platform-built
+images use the reusable workflow's version tag as their identity
+([ADR-0008](docs/adr/0008-reusable-workflow-central-pipeline.md)).
 
 **3. `ImagePullBackOff`.** Either the pull secret or the platform:
 
