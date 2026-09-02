@@ -9,4 +9,4 @@ resources:
 
 images:
 - name: ghcr.io/itayna/java-sample-app
-  newTag: 4c83cb77409e
+  newTag: c77f8b6a896f
