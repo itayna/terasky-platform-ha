@@ -1,0 +1,18 @@
+# The sealed-secrets controller's private key. RUNBOOK.md tells you to dump it
+# here when backing up a cluster; it is a plaintext key and must never be
+# committed. Store it wherever the organisation keeps root credentials.
+sealed-secrets-key.yaml
+*sealed-secrets-key*.yaml
+
+# Raw material for kubeseal — the unsealed secret, before it is encrypted.
+ghcr-secret.yaml
+*.unsealed.yaml
+
+# Keys and certificates, in case one is ever written into the working tree.
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# Local noise
+.DS_Store

@@ -202,7 +202,7 @@ platform is specified and deliberately not implemented
 | `bin/platformctl` | Onboarding: repo + manifests + Applications + catalog + PR |
 | `bin/scorecard` | Asserts the platform bar per service, writes `CATALOG.md` |
 | `catalog/services.yaml` | Service identity — the one hand-edited list |
-| `templates/service-v1/` | The golden path: what a new service is rendered from |
+| `templates/service-v1/` | The golden path: what a new service is rendered from ([ADR-0012](docs/adr/0012-template-versioning.md)) |
 | `clusters/kind-{dev,prod}/` | `kind` config + bootstrap script per cluster |
 | `clusters/policies/` | Kyverno `ClusterPolicy` (signature enforcement) |
 | `gitops/argocd-apps/root-{dev,prod}.yaml` | App-of-apps roots — the only `kubectl apply` |

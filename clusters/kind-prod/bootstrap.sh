@@ -61,5 +61,5 @@ echo ""
 echo "==> Bootstrap complete for ${CLUSTER_NAME}"
 echo "==> ArgoCD admin password:"
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d && echo
-echo "==> Port-forward ArgoCD UI: kubectl port-forward svc/argocd-server -n argocd 9080:443"
-echo "==> Access: https://localhost:9080 (admin / <password above>)"
+echo "==> Port-forward ArgoCD UI: kubectl port-forward svc/argocd-server -n argocd 9081:443"
+echo "==> Access: https://localhost:9081 (admin / <password above>)"

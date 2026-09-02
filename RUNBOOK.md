@@ -294,7 +294,7 @@ start rather than trying to unwind.
 | PR merged, no pods in dev | the service has no image yet | expected: `newTag: awaiting-first-build`. The first push to the service repo produces the first image |
 | Prod Application `Degraded` for a new service | expected until first promotion: `newTag: awaiting-first-promotion` has no image, so Kyverno cannot verify a signature and denies the Pod (`failed to verify image ... MANIFEST_UNKNOWN`) — the policy failing closed, not a pull failure | nothing to fix. It clears when someone runs `promote-prod`; `CATALOG.md` shows the service as `— not in prod` |
 | PR merged, Application missing in Argo CD | root app not registered on that cluster | `make apps` (once per cluster, ever), then `make status` |
-| Pods `ImagePullBackOff` | the shared GHCR pull secret is missing or sealed for the other cluster | `kubectl -n default get secret ghcr-pull`; reseal `environments/<env>/_platform/` for that cluster |
+| Pods `ImagePullBackOff` | the shared GHCR pull secret is missing or sealed for the other cluster | `kubectl -n default get secret ghcr-pull-secret`; reseal `environments/<env>/_platform/` for that cluster |
 | Pods denied at admission | the image is not signed by the pipeline identity | the service is probably still on a copied workflow — see the Pipeline column above |
 
 Dry-run first when in doubt: `bin/platformctl new <svc> --dry-run` renders the
