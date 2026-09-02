@@ -232,10 +232,11 @@ previous prod tag, `bc35f2ec0a3b`, is pre-v1 and is exactly what reverting the
 current promotion PR would deploy; deleting the attestor now would turn the
 documented rollback into an admission denial. It goes after the next promotion,
 when the rollback target is v1-signed. And a real test for the reference app —
-the suite is one `contextLoads()`, which I had verified the lint gate around and
-never the test gate — is drafted but not committed until `mvn -B verify` has
-run on it locally, because the model cannot build Java 25 and a test that fails
-in the pipeline is worse than no test.
+the suite was one `contextLoads()`, which I had verified the lint gate around and
+never the test gate — was held back until `mvn -B verify` had run on it locally,
+because the model cannot build Java 25 and a test that fails in the pipeline is
+worse than no test. It passed (3 tests, 0 Checkstyle violations) and was then
+committed; the delivery run on that push verified it a second time.
 
 Nothing this pass could produce was verifiable by the model that produced it:
 no cluster, no build, no GitHub credentials. That is the same constraint as the
