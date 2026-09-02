@@ -20,7 +20,7 @@ decrypts it into a normal `Secret` in the target namespace.
 ## Consequences
 
 - The committed artefact is useless to anyone without the target cluster's
-  controller key, including someone who clones this private repository.
+  controller key, including anyone who clones this repository — which is public.
 - A `SealedSecret` sealed for dev cannot decrypt in prod. Cross-environment copy
   paste fails loudly instead of silently sharing a credential.
 - Cost: the controller's key is now cluster state that must be backed up, or a

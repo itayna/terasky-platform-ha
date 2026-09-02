@@ -19,8 +19,10 @@ admission policy trusts.
 Two repositories:
 
 - `itayna/java-sample-app` (public) — source, Dockerfile, `delivery.yml`.
-- `itayna/terasky-platform-ha` (private) — cluster configs, Argo CD
-  Applications, Kyverno policy, per-environment manifests, sealed secrets, docs.
+- `itayna/terasky-platform-ha` — cluster configs, Argo CD Applications,
+  Kyverno policy, per-environment manifests, sealed secrets, docs. Designed
+  as a private repository; public at the time of review so it can be read
+  without collaborator invitations (see *Visibility* below).
 
 CI in the application repository writes exactly one line into the platform
 repository — the dev image tag — using an SSH deploy key scoped to that one
@@ -36,13 +38,28 @@ repository.
   read end to end, and the deploy key is a credential to rotate
   ([RUNBOOK.md](../../RUNBOOK.md#rotating-the-ci-deploy-key)).
 
+## Visibility
+
+The split is an enforcement boundary on **write** access, and that survives
+the platform repository being public. Nothing in it depends on secrecy: the
+`SealedSecret`s are safe to publish by construction — they decrypt only on the
+cluster whose controller key sealed them ([ADR-0004](0004-sealed-secrets.md));
+the Argo CD deploy key and the pipeline's write key are held in cluster and in
+service-repository secrets, never here; and the trusted signing identity is
+verified at admission, so knowing it buys an attacker nothing. What a public
+repository does give up is that cluster topology and environment pins are
+readable by anyone, which in a real organisation is reason enough to keep it
+private. The rejection of the monorepo below stands either way: it is about who
+can *change* the prod tag, not who can see it.
+
 ## Alternatives rejected
 
 **Monorepo (app + manifests together).** Simpler to follow, and a single PR can
 change code and its manifest atomically. Rejected because the platform
 repository is the enforcement boundary: with one repository, every application
 contributor gets write access to the file that decides what runs in prod, and
-the sealed secrets and trusted signing identity sit in a public fork's history.
+the prod tag sits in a fork's history that every application contributor can
+push to.
 
 **Manifests in the app repository, Argo CD pointed at each app repo.** Scales
 per-team ownership nicely and is common with Flux. Rejected for now because the

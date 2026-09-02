@@ -186,6 +186,62 @@ drafts described intent as if it were verified ("ensures", "guarantees"). Anythi
 not demonstrated was either demonstrated or downgraded to what it is. The scorecard
 exists partly because I did not want to be the mechanism keeping those claims true.
 
+## Review pass after the timebox (2026-09-02)
+
+Asked a model to audit the three repositories against the assignment PDF as a
+reviewer would: every must/should, every deliverable, every command in the docs
+run or resolved against the files. The clusters had been deleted by then, so
+nothing live could be checked — which turned out to be the point.
+
+**What it found that I had missed.** `runbooks/SETUP.md` and
+`runbooks/DEPLOY.md` were Stage 1 documents that the Stage 2 restructure had
+silently orphaned: SETUP applied `gitops/argocd-apps/dev-app.yaml`, a file that
+no longer existed, sealed the pull secret to the old path, and omitted
+`make repo-secret` — a reviewer following it would have got an Argo CD that
+could not read the repository. DEPLOY told the operator to hand-edit
+`environments/prod/` with a commit message `bin/scorecard` does not match, so a
+promotion done by following my own runbook was a red row in my own catalog; the
+local branch I had left behind from a rollback test was literally that
+procedure. Both bootstrap scripts printed an Argo CD port-forward on the host
+ports `kind-config.yaml` already publishes, so the first command of the demo
+would have failed with `address already in use`. And the assignment's
+template-versioning question (v1 → v2) had no ADR, no FUTURE entry, nothing —
+ADR-0010 covers the pipeline and I had read that as covering the templates.
+
+**What I kept.** Rewritten SETUP and DEPLOY, reviewed line by line against the
+Makefile and the workflows; ADR-0012, whose argument — that copies are the right
+shape for desired state precisely because the floating tag is the right shape
+for CI — I agree with and would have written more weakly; a README for the
+reference app, which every scaffolded service inherits and which had still been
+the upstream three-liner; a `.gitignore` for the sealed-secrets key backup the
+RUNBOOK tells you to create. The stale Stage 1 design spec under
+`docs/superpowers/` was deleted: it contradicted ADR-0008 and the README, and I
+had already removed one duplicate architecture document for exactly that reason.
+
+**What was wrong in its output.** It dated ADR-0012 `2026-08-21` — inside the
+timebox, which is not when it was written. Corrected to the real date; a commit
+date that contradicts the document is worse than a document that admits the gap
+was found in review. It also asserted, in the reference app's README, that
+removing the Tomcat pin "fails the pipeline's Trivy gate" — true when the pin
+was added, unverified today, and softened to what is known.
+
+**What I rejected or deferred.** Removing the Kyverno policy's migration
+attestor, which ADR-0008 says to delete once no pre-v1 image is a rollback
+candidate. The model was right that it widens what admission trusts. But the
+previous prod tag, `bc35f2ec0a3b`, is pre-v1 and is exactly what reverting the
+current promotion PR would deploy; deleting the attestor now would turn the
+documented rollback into an admission denial. It goes after the next promotion,
+when the rollback target is v1-signed. And a real test for the reference app —
+the suite is one `contextLoads()`, which I had verified the lint gate around and
+never the test gate — is drafted but not committed until `mvn -B verify` has
+run on it locally, because the model cannot build Java 25 and a test that fails
+in the pipeline is worse than no test.
+
+Nothing this pass could produce was verifiable by the model that produced it:
+no cluster, no build, no GitHub credentials. That is the same constraint as the
+capability in [docs/ai-capability.md](docs/ai-capability.md), and the same
+answer — its output is a list of claims, and the rebuild is what checks them.
+
 ## What I would not use it for again unchanged
 
 Anything where the model's output is trusted without a way to check it. The one AI

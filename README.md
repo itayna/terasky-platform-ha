@@ -25,7 +25,7 @@ Everything here runs on free, open-source tooling against local `kind` clusters.
                                                  │ commit dev tag ──────────┐    │
                                                  └──────────────────────────┼────┘
 ┌────────────────────────────────────────────────────────────────────────◀──┘
-│ terasky-platform-ha (private) — this repo, the only deploy input
+│ terasky-platform-ha — this repo, the only deploy input
 │
 │  environments/dev/<service>    Deployment, 2 replicas
 │  environments/prod/<service>   Rollout, canary 20/40/60/80 + analysis

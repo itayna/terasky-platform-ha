@@ -80,6 +80,12 @@ item 1 gives it real signals to reason about.
   no human watching a UI, that decision flips.
 - **A staging environment.** A third environment would have added a copy of an
   existing pattern, not a new one. The promotion mechanism is identical.
+- **Template migration tooling.** Templates are copies, versioned by directory,
+  and a golden-path change reaches existing services by a reviewed pull request
+  rather than reconciliation — deliberately, and for reasons that differ from the
+  pipeline's floating tag ([ADR-0012](docs/adr/0012-template-versioning.md)). A
+  version stamp on generated Applications, a Template column in the scorecard and
+  a `platformctl upgrade` are the next step, and the ADR names the trigger.
 - **Gradual rollout of a pipeline release.** A bad `v1` reaches every service at
   once; the mitigation is immutable `v1.x` tags and a tag-move rollback
   ([ADR-0010](docs/adr/0010-pipeline-version-tags.md)). Canarying a pipeline
