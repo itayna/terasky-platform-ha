@@ -15,6 +15,149 @@ clusters ([ADR-0002](docs/adr/0002-kind-two-clusters.md)).
 
 ---
 
+## From a brand-new machine
+
+The whole platform, from a laptop that has never seen it, in about fifteen
+minutes. Every command here was run on 2026-09-02 against freshly created
+clusters; the three bugs that run found are fixed in the commits it produced.
+The *why* of each step is in [runbooks/SETUP.md](runbooks/SETUP.md); this is
+the *what*, in order, with nothing left out.
+
+### 0. Tools (macOS)
+
+```bash
+brew install --cask docker                      # Docker Desktop; open it once and let it start
+brew install kind kubectl helm kubeseal cosign gh yq maven argocd
+brew install argoproj/tap/kubectl-argo-rollouts # `kubectl argo rollouts ...` used throughout
+docker info >/dev/null && echo docker ok        # must succeed before anything below
+```
+
+### 1. GitHub
+
+```bash
+gh auth login -s read:packages   # browser flow; read:packages is for the GHCR pull secret
+gh auth setup-git                # so git push over HTTPS uses the gh login
+mkdir -p ~/Projects/Interviews/TeraSky && cd ~/Projects/Interviews/TeraSky
+gh repo clone itayna/terasky-platform-ha
+gh repo clone itayna/java-sample-app             # only needed to run the app or its tests locally
+cd terasky-platform-ha
+```
+
+### 2. Clusters and platform components
+
+```bash
+make bootstrap
+```
+
+Both `kind` clusters, Argo CD `v2.12.3`, sealed-secrets `v0.27.1`, Kyverno chart
+`3.8.2`, the signature policy, and on prod Argo Rollouts `v1.9.1`. About five
+minutes. Idempotent — re-run it if anything transient fails.
+
+### 3. Reseal the GHCR pull secret — every fresh cluster, no exceptions
+
+New clusters have new sealed-secrets keys, so the committed `SealedSecret`s
+cannot decrypt and every pod would sit in `ImagePullBackOff`. The token comes
+from the `gh` login (scope added in step 1), so nothing is pasted:
+
+```bash
+GHCR_PAT=$(gh auth token); echo ${#GHCR_PAT}     # expect 40
+for env in dev prod; do
+  kubectl config use-context kind-kind-$env
+  kubectl create secret docker-registry ghcr-pull-secret \
+    --namespace default --docker-server=ghcr.io \
+    --docker-username=itayna --docker-password="$GHCR_PAT" \
+    --dry-run=client -o yaml \
+  | kubeseal --controller-namespace kube-system \
+             --controller-name sealed-secrets-controller --format yaml \
+  > environments/$env/_platform/sealed-secret-ghcr.yaml
+done
+unset GHCR_PAT
+git add environments/*/_platform/sealed-secret-ghcr.yaml
+git commit -m "reseal ghcr pull secret for rebuilt clusters" && git push
+```
+
+Push is mandatory: Argo CD reads the repository, not the working tree.
+
+### 4. Argo CD's read key — a new machine means a new key
+
+The private key never leaves the machine that made it, so a new laptop has no
+key for the deploy key GitHub still lists. Replace rather than accumulate:
+
+```bash
+gh repo deploy-key list --repo itayna/terasky-platform-ha         # note the ID of argocd-read-only
+gh repo deploy-key delete <ID> --repo itayna/terasky-platform-ha  # the old one, whose private half is gone
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/argocd_platform -C argocd-read
+gh repo deploy-key add ~/.ssh/argocd_platform.pub --repo itayna/terasky-platform-ha --title argocd-read-only
+make repo-secret DEPLOY_KEY=~/.ssh/argocd_platform
+```
+
+Read-only is enough. The pipeline's *write* key is a separate credential held
+in each service repository's secrets and is not machine-bound; nothing to do.
+
+### 5. Register the roots, then wait
+
+```bash
+make apps                 # once per cluster, ever
+sleep 150 && make status  # Argo CD needs a sync interval to clone and reconcile
+```
+
+Expected, and nothing else needs doing when you see it:
+
+| Cluster | Applications | Pods |
+|---|---|---|
+| dev | five `Synced` / `Healthy` | six `Running` (two per service) |
+| prod | `java-sample-app-prod` `Synced` / `Healthy`; `root-prod`, `platform-prod` `Healthy`; the two never-promoted services `Synced` / `Progressing` then `Degraded` | three `java-sample-app` `Running` |
+
+The two `Degraded` prod apps are Kyverno denying a Pod whose image tag is the
+`awaiting-first-promotion` placeholder — the policy failing closed. Correct, and
+documented under [Onboarding failed halfway](#onboarding-failed-halfway).
+
+### 6. Prove it
+
+```bash
+kubectl --context kind-kind-dev  get clusterpolicy verify-image-signatures -o jsonpath='{.status.ready}{"\n"}'
+kubectl --context kind-kind-prod get clusterpolicy verify-image-signatures -o jsonpath='{.status.ready}{"\n"}'
+curl -s http://localhost:8080 ; echo                  # dev app, via the kind host port
+curl -s http://localhost:9080/actuator/health ; echo  # prod app
+bin/scorecard                                         # every row green, exit 0
+```
+
+Argo CD UI, on ports `kind` does **not** already own:
+
+```bash
+kubectl --context kind-kind-dev  -n argocd port-forward svc/argocd-server 8081:443 &
+kubectl --context kind-kind-prod -n argocd port-forward svc/argocd-server 9081:443 &
+make passwords                                        # admin / <printed>, https://localhost:8081 and :9081
+```
+
+### After a reboot — not a rebuild
+
+`kind` clusters are Docker containers and survive a restart; sealed-secrets keys
+and the Argo CD credential live inside them. If `make status` cannot connect:
+
+```bash
+docker start kind-dev-control-plane kind-prod-control-plane
+sleep 60 && make status
+```
+
+Nothing in steps 3–5 is repeated. Only a *deleted* cluster needs the reseal.
+
+### Before a demo
+
+```bash
+docker info >/dev/null && kind get clusters          # both listed
+make status                                          # matches the table in step 5
+gh auth status                                       # logged in; promote-prod and platformctl need it
+kubectl argo rollouts version                        # plugin present for the live rollback
+```
+
+A push to `java-sample-app` `main` takes about ten minutes to reach dev (the
+multi-arch build dominates). A promotion PR merge starts the prod canary within
+one sync interval and the canary itself runs about eight minutes at the default
+steps. Budget for both if the walkthrough is live.
+
+---
+
 ## Debugging "my deploy is stuck"
 
 Work down this list. It is ordered by how often each cause actually fires.

@@ -70,9 +70,11 @@ make passwords                                   # Argo CD admin passwords
 
 `make bootstrap` is idempotent — existing clusters are reused, components are
 `helm upgrade --install`/`kubectl apply`. `make apps` is once per cluster, ever:
-after it, services register themselves through Git. Full manual walkthrough,
-including sealing a fresh GHCR pull secret, is in
-[runbooks/SETUP.md](runbooks/SETUP.md).
+after it, services register themselves through Git. Fresh clusters also need the
+GHCR pull secret resealed and a deploy key for Argo CD — the complete sequence
+from a machine with nothing installed, validated end to end, is
+[RUNBOOK.md — From a brand-new machine](RUNBOOK.md#from-a-brand-new-machine);
+the reasoning behind each step is [runbooks/SETUP.md](runbooks/SETUP.md).
 
 The GHCR pull secret is one `SealedSecret` per environment in
 `environments/<env>/_platform/`, shared by every service. It only decrypts on the

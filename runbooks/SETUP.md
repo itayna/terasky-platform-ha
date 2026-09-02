@@ -13,14 +13,26 @@ a credential that is not, and must not be, in this repository:
 Order matters. Registering the roots first gives you two Argo CD instances that
 cannot read the repository, syncing services that cannot pull images.
 
+The complete copy-paste sequence for a machine that has never seen this
+platform — tools included, validated on fresh clusters — is
+[RUNBOOK.md — From a brand-new machine](../RUNBOOK.md#from-a-brand-new-machine).
+This file explains each step.
+
 ## Prerequisites
 
-- Docker, `kind`, `kubectl`, `helm`
-- `kubeseal` (`brew install kubeseal`) — sealing the pull secret
-- `cosign` — verifying signatures by hand, and `bin/scorecard`
-- `gh`, authenticated — `bin/platformctl`, `bin/scorecard`
-- A GitHub PAT with `read:packages`, for the GHCR pull secret
-- An SSH keypair for Argo CD's read access to this repository
+```bash
+brew install --cask docker
+brew install kind kubectl helm kubeseal cosign gh yq maven argocd
+brew install argoproj/tap/kubectl-argo-rollouts
+gh auth login -s read:packages
+```
+
+- Docker, `kind`, `kubectl`, `helm` — the clusters and what runs on them
+- `kubeseal` — sealing the pull secret; `cosign` — verifying signatures, `bin/scorecard`
+- `gh`, logged in **with `read:packages`** — `bin/platformctl`, `bin/scorecard`, and
+  `gh auth token` is what the pull secret is sealed from (no separate PAT to manage)
+- `kubectl-argo-rollouts`, `argocd`, `yq` — used by the runbooks
+- An SSH keypair for Argo CD's read access, generated on this machine (step 3)
 
 ## 1. Clusters and platform components
 
@@ -48,21 +60,23 @@ creates the `Secret`.
 So: after any fresh `make bootstrap`, re-seal both, or nothing pulls.
 
 ```bash
-# dev
-kubectl config use-context kind-kind-dev
-kubectl create secret docker-registry ghcr-pull-secret \
-  --namespace default \
-  --docker-server=ghcr.io \
-  --docker-username=<github-username> \
-  --docker-password=<github-pat-with-read:packages> \
-  --dry-run=client -o yaml \
-| kubeseal --controller-namespace kube-system \
-           --controller-name sealed-secrets-controller \
-           --format yaml \
-> environments/dev/_platform/sealed-secret-ghcr.yaml
+GHCR_PAT=$(gh auth token)                 # the gh login carries read:packages
+for env in dev prod; do
+  kubectl config use-context kind-kind-$env
+  kubectl create secret docker-registry ghcr-pull-secret \
+    --namespace default --docker-server=ghcr.io \
+    --docker-username=itayna --docker-password="$GHCR_PAT" \
+    --dry-run=client -o yaml \
+  | kubeseal --controller-namespace kube-system \
+             --controller-name sealed-secrets-controller --format yaml \
+  > environments/$env/_platform/sealed-secret-ghcr.yaml
+done
+unset GHCR_PAT
 ```
 
-Repeat for prod with `kind-kind-prod` and `environments/prod/_platform/`.
+Sealing from the `gh` OAuth token is a local-demo convenience: `gh auth logout`
+would break image pulls. A real deployment uses a dedicated token, and the
+direction beyond that is External Secrets ([ADR-0004](../docs/adr/0004-sealed-secrets.md)).
 
 Then commit and push. Argo CD deploys from the repository, not from your
 working tree — an unpushed reseal changes nothing in either cluster:
@@ -76,9 +90,12 @@ git push
 ## 3. Argo CD's read access to this repository
 
 ```bash
-gh repo deploy-key add ~/.ssh/platform_key.pub \
-  --repo itayna/terasky-platform-ha --title argocd-read
-make repo-secret DEPLOY_KEY=~/.ssh/platform_key
+gh repo deploy-key list --repo itayna/terasky-platform-ha           # an old argocd-read-only? delete it —
+gh repo deploy-key delete <ID> --repo itayna/terasky-platform-ha    # its private half is on another machine
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/argocd_platform -C argocd-read
+gh repo deploy-key add ~/.ssh/argocd_platform.pub \
+  --repo itayna/terasky-platform-ha --title argocd-read-only
+make repo-secret DEPLOY_KEY=~/.ssh/argocd_platform
 ```
 
 Read-only is enough. The pipeline's *write* key
