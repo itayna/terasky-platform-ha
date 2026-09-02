@@ -31,7 +31,7 @@ make bootstrap
 Per cluster: Argo CD `v2.12.3`, sealed-secrets `v0.27.1`, Kyverno chart `3.8.2`
 (app `v1.18.2` — the two numbering schemes are not the same, and confusing them
 has already cost one failed bootstrap), and the signature `ClusterPolicy` from
-`clusters/policies/`. `kind-prod` additionally gets Argo Rollouts.
+`clusters/policies/`. `kind-prod` additionally gets Argo Rollouts `v1.9.1`.
 
 Idempotent: existing clusters are reused, components are
 `helm upgrade --install` / `kubectl apply`. Safe to re-run.

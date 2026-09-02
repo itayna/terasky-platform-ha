@@ -125,6 +125,30 @@ Then delete one app pod and confirm its replacement is admitted. If the policy
 schema changed, `spec.validationFailureAction` and the `verifyImages` block are
 the fields that move between Kyverno majors — check both.
 
+## Upgrading Argo Rollouts
+
+Pinned as `ARGO_ROLLOUTS_VERSION` in `clusters/kind-prod/bootstrap.sh`; prod only.
+
+It was unpinned (`releases/latest`) until a fresh bootstrap six days after the
+last one pulled v1.10.0 and failed on CRDs too large for client-side apply. The
+install is now `kubectl apply --server-side` of the pinned release manifest,
+which is also the upgrade:
+
+1. Read the release notes for the `Rollout` and `AnalysisTemplate` schema — the
+   canary `steps` block and the `web` analysis provider are the fields this
+   platform depends on.
+2. Bump the pin, re-run `make bootstrap-prod`. Rollouts is not installed on dev,
+   so there is no dev rehearsal for this one component; rehearse instead by
+   promoting a known-good tag and watching a full canary complete:
+   ```bash
+   kubectl argo rollouts get rollout java-sample-app -n default --watch
+   ```
+3. Confirm the `ClusterAnalysisTemplate` still resolves: an `AnalysisRun` stuck
+   `Pending` after the upgrade means the template schema moved.
+
+Rollback: re-apply the previous version's manifest the same way. As with Argo
+CD, CRD schema changes are the part that may not reverse cleanly.
+
 ## Kyverno is down and nothing can schedule
 
 Symptom: every pod creation in `default` fails with a webhook error, including

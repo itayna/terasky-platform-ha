@@ -5,6 +5,7 @@ CLUSTER_NAME="kind-prod"
 ARGOCD_VERSION="v2.12.3"
 SEALED_SECRETS_VERSION="v0.27.1"
 KYVERNO_CHART_VERSION="3.8.2"
+ARGO_ROLLOUTS_VERSION="v1.9.1"
 
 echo "==> Bootstrapping ${CLUSTER_NAME}"
 
@@ -49,9 +50,16 @@ echo "==> Applying Kyverno image signature policy"
 kubectl apply -f "$(dirname "$0")/../policies/verify-image-signatures.yaml"
 
 # Install Argo Rollouts (prod only)
-echo "==> Installing Argo Rollouts"
+echo "==> Installing Argo Rollouts ${ARGO_ROLLOUTS_VERSION}"
 kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+# Pinned, and applied server-side. This used to fetch releases/latest with a
+# client-side apply; six days after the last bootstrap, v1.10.0 shipped CRDs
+# too large for the last-applied-configuration annotation (256 KiB cap) and a
+# fresh `make bootstrap` failed with "metadata.annotations: Too long". Server-
+# side apply stores no such annotation, and the pin means a reviewer gets the
+# version this platform was actually validated against, not whatever is newest.
+kubectl apply --server-side -n argo-rollouts \
+  -f "https://github.com/argoproj/argo-rollouts/releases/download/${ARGO_ROLLOUTS_VERSION}/install.yaml"
 
 echo "==> Waiting for Argo Rollouts to be ready"
 kubectl wait --for=condition=available --timeout=300s deployment/argo-rollouts -n argo-rollouts

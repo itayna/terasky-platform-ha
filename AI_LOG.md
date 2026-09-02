@@ -243,6 +243,17 @@ because the model cannot build Java 25 and a test that fails in the pipeline is
 worse than no test. It passed (3 tests, 0 Checkstyle violations) and was then
 committed; the delivery run on that push verified it a second time.
 
+**What the rebuild found that no review could.** `make bootstrap` on fresh
+clusters failed in prod: Argo Rollouts was the one component installed from
+`releases/latest`, and v1.10.0 had shipped six days after my last bootstrap with
+CRDs too large for client-side `kubectl apply`. Every other version in the
+script was pinned; this one was not, and the platform was unreproducible from
+its own README within a week of submission — the assignment calls
+reproducibility a hard requirement, and this is exactly the way it fails
+quietly. Pinned to v1.9.1, the version everything here was validated against,
+and switched to server-side apply. The model had read the bootstrap scripts
+twice and reported them consistent; it never noticed the unpinned URL either.
+
 Nothing this pass could produce was verifiable by the model that produced it:
 no cluster, no build, no GitHub credentials. That is the same constraint as the
 capability in [docs/ai-capability.md](docs/ai-capability.md), and the same
