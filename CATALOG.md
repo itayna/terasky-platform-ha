@@ -6,7 +6,7 @@ deployed where, and whether it still meets the platform bar.
 
 | Service | Owner | Pipeline | Lint | Dev tag | Signed | SBOM | GitOps | Prod tag | Promoted via PR |
 |---|---|---|---|---|---|---|---|---|---|
-| `java-sample-app` | @itayna | ✅ v1 | ✅ | `4c83cb77409e` | ✅ | ✅ | ✅ | `4c83cb77409e` | ✅ |
+| `java-sample-app` | @itayna | ✅ v1 | ✅ | `c77f8b6a896f` | ✅ | ✅ | ✅ | `4c83cb77409e` | ✅ |
 | `notifications-service` | @itayna | ✅ v1 | ✅ | `b5370e68d48a` | ✅ | ✅ | ✅ | `awaiting-first-promotion` | — not in prod |
 | `inventory-service` | @itayna | ✅ v1 | ✅ | `a93e92b867d7` | ✅ | ✅ | ✅ | `awaiting-first-promotion` | — not in prod |
 
