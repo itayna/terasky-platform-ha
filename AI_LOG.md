@@ -260,6 +260,16 @@ because I had typed an absolute path. Fixed in the Makefile so the documented
 command is the working one; the rebuild is the only thing that would have
 caught it, and it did so on the third step.
 
+With those three fixed, the rest of the rebuild was the repository doing what
+it claims: `make bootstrap`, reseal, `make repo-secret`, `make apps`, and both
+clusters reconciled back to the committed state with nobody touching `kubectl`
+for a workload. Prod came up on the same ReplicaSet hash the August snapshot
+recorded — identical pod template from identical Git — and the two services
+never promoted to prod are `Degraded` on their placeholder tag, which is Kyverno
+failing closed exactly as the RUNBOOK says it should. Two docs bugs and one
+unpinned dependency stood between a fresh machine and that state; none of the
+three was visible by reading.
+
 Nothing this pass could produce was verifiable by the model that produced it:
 no cluster, no build, no GitHub credentials. That is the same constraint as the
 capability in [docs/ai-capability.md](docs/ai-capability.md), and the same
