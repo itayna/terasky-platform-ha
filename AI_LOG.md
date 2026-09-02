@@ -253,6 +253,12 @@ reproducibility a hard requirement, and this is exactly the way it fails
 quietly. Pinned to v1.9.1, the version everything here was validated against,
 and switched to server-side apply. The model had read the bootstrap scripts
 twice and reported them consistent; it never noticed the unpinned URL either.
+Then `make repo-secret DEPLOY_KEY=~/.ssh/key` — the exact form the README
+documents — failed, because make passes the value verbatim and the shell does
+not tilde-expand inside `--from-file=name=~/path`. It had worked in August only
+because I had typed an absolute path. Fixed in the Makefile so the documented
+command is the working one; the rebuild is the only thing that would have
+caught it, and it did so on the third step.
 
 Nothing this pass could produce was verifiable by the model that produced it:
 no cluster, no build, no GitHub credentials. That is the same constraint as the

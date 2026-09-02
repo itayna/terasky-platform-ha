@@ -20,10 +20,14 @@ bootstrap-prod: ## kind-prod + the above + Argo Rollouts
 
 repo-secret: ## Give Argo CD read access to this repo (DEPLOY_KEY=~/.ssh/key)
 	@test -n "$(DEPLOY_KEY)" || { echo "usage: make repo-secret DEPLOY_KEY=~/.ssh/key"; exit 1; }
-	@for ctx in $(DEV_CTX) $(PROD_CTX); do \
+	@# make hands DEPLOY_KEY over verbatim, and the shell does not tilde-expand
+	@# inside --from-file=name=~/path, so resolve it to a real path first and
+	@# fail here, readably, rather than from kubectl with "no objects passed".
+	@KEY=$$(eval echo $(DEPLOY_KEY)); test -f "$$KEY" || { echo "error: no such file: $$KEY"; exit 1; }; \
+	for ctx in $(DEV_CTX) $(PROD_CTX); do \
 	  kubectl --context $$ctx -n argocd create secret generic terasky-platform-ha-repo \
 	    --from-literal=type=git --from-literal=url=$(REPO_URL) \
-	    --from-file=sshPrivateKey=$(DEPLOY_KEY) \
+	    --from-file=sshPrivateKey="$$KEY" \
 	    --dry-run=client -o yaml | kubectl --context $$ctx apply -f - ; \
 	  kubectl --context $$ctx -n argocd label secret terasky-platform-ha-repo \
 	    argocd.argoproj.io/secret-type=repository --overwrite ; \
