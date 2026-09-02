@@ -223,7 +223,12 @@ timebox, which is not when it was written. Corrected to the real date; a commit
 date that contradicts the document is worse than a document that admits the gap
 was found in review. It also asserted, in the reference app's README, that
 removing the Tomcat pin "fails the pipeline's Trivy gate" — true when the pin
-was added, unverified today, and softened to what is known.
+was added, unverified today, and softened to what is known. And its edit to the
+two bootstrap scripts' port hints went through a mounted filesystem that drops
+the executable bit, so the commit silently carried `mode 100755 => 100644` and
+`make bootstrap` failed with `Permission denied` on the next run — its own
+"only echo lines changed" check compared content, not mode. Caught by running
+the bootstrap, which is the check that matters.
 
 **What I rejected or deferred.** Removing the Kyverno policy's migration
 attestor, which ADR-0008 says to delete once no pre-v1 image is a rollback
